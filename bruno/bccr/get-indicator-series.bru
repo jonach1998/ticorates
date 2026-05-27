@@ -1,0 +1,17 @@
+meta {
+  name: Get indicator series by code and date
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{bccrBaseUrl}}/indicadoresEconomicos/317/series?fechaInicio=2026%2F05%2F22&fechaFin=2026%2F05%2F22&idioma=EN
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{bccrToken}}
+  Content-Type: application/json
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+}

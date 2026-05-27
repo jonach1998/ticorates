@@ -1,0 +1,260 @@
+{
+  "USD": {
+    "type": "direct",
+    "purchase": 317,
+    "sale": 318,
+    "description": "United States Dollar"
+  },
+  "EUR": {
+    "type": "cross_rate",
+    "reference_code": 333,
+    "usd_is_base": false,
+    "description": "Euro (European Union)"
+  },
+  "GBP": {
+    "type": "cross_rate",
+    "reference_code": 330,
+    "usd_is_base": false,
+    "description": "British Pound Sterling (United Kingdom)"
+  },
+  "AUD": {
+    "type": "cross_rate",
+    "reference_code": 3433,
+    "usd_is_base": false,
+    "description": "Australian Dollar (Australia)"
+  },
+  "JPY": {
+    "type": "cross_rate",
+    "reference_code": 325,
+    "usd_is_base": true,
+    "description": "Japanese Yen (Japan)"
+  },
+  "CHF": {
+    "type": "cross_rate",
+    "reference_code": 326,
+    "usd_is_base": true,
+    "description": "Swiss Franc (Switzerland)"
+  },
+  "CAD": {
+    "type": "cross_rate",
+    "reference_code": 328,
+    "usd_is_base": true,
+    "description": "Canadian Dollar (Canada)"
+  },
+  "SEK": {
+    "type": "cross_rate",
+    "reference_code": 335,
+    "usd_is_base": true,
+    "description": "Swedish Krona (Sweden)"
+  },
+  "KRW": {
+    "type": "cross_rate",
+    "reference_code": 337,
+    "usd_is_base": true,
+    "description": "South Korean Won (South Korea)"
+  },
+  "DKK": {
+    "type": "cross_rate",
+    "reference_code": 342,
+    "usd_is_base": true,
+    "description": "Danish Krone (Denmark)"
+  },
+  "NOK": {
+    "type": "cross_rate",
+    "reference_code": 343,
+    "usd_is_base": true,
+    "description": "Norwegian Krone (Norway)"
+  },
+  "PLN": {
+    "type": "cross_rate",
+    "reference_code": 3430,
+    "usd_is_base": true,
+    "description": "Polish Zloty (Poland)"
+  },
+  "HKD": {
+    "type": "cross_rate",
+    "reference_code": 3052,
+    "usd_is_base": true,
+    "description": "Hong Kong Dollar (Hong Kong)"
+  },
+  "SGD": {
+    "type": "cross_rate",
+    "reference_code": 21270,
+    "usd_is_base": true,
+    "description": "Singapore Dollar (Singapore)"
+  },
+  "NZD": {
+    "type": "cross_rate",
+    "reference_code": 21269,
+    "usd_is_base": true,
+    "description": "New Zealand Dollar (New Zealand)"
+  },
+  "CNY": {
+    "type": "cross_rate",
+    "reference_code": 3364,
+    "usd_is_base": true,
+    "description": "Chinese Yuan Renminbi (China)"
+  },
+  "INR": {
+    "type": "cross_rate",
+    "reference_code": 21267,
+    "usd_is_base": true,
+    "description": "Indian Rupee (India)"
+  },
+  "TWD": {
+    "type": "cross_rate",
+    "reference_code": 3053,
+    "usd_is_base": true,
+    "description": "Taiwan Dollar (Taiwan)"
+  },
+  "THB": {
+    "type": "cross_rate",
+    "reference_code": 21262,
+    "usd_is_base": true,
+    "description": "Thai Baht (Thailand)"
+  },
+  "MYR": {
+    "type": "cross_rate",
+    "reference_code": 25067,
+    "usd_is_base": true,
+    "description": "Malaysian Ringgit (Malaysia)"
+  },
+  "IDR": {
+    "type": "cross_rate",
+    "reference_code": 21263,
+    "usd_is_base": true,
+    "description": "Indonesian Rupiah (Indonesia)"
+  },
+  "AED": {
+    "type": "cross_rate",
+    "reference_code": 21264,
+    "usd_is_base": true,
+    "description": "UAE Dirham (United Arab Emirates)"
+  },
+  "ILS": {
+    "type": "cross_rate",
+    "reference_code": 21266,
+    "usd_is_base": true,
+    "description": "Israeli New Shekel (Israel)"
+  },
+  "JOD": {
+    "type": "cross_rate",
+    "reference_code": 22204,
+    "usd_is_base": true,
+    "description": "Jordanian Dinar (Jordan)"
+  },
+  "MAD": {
+    "type": "cross_rate",
+    "reference_code": 21265,
+    "usd_is_base": true,
+    "description": "Moroccan Dirham (Morocco)"
+  },
+  "ZAR": {
+    "type": "cross_rate",
+    "reference_code": 21881,
+    "usd_is_base": true,
+    "description": "South African Rand (South Africa)"
+  },
+  "EGP": {
+    "type": "cross_rate",
+    "reference_code": 21268,
+    "usd_is_base": true,
+    "description": "Egyptian Pound (Egypt)"
+  },
+  "MXN": {
+    "type": "cross_rate",
+    "reference_code": 332,
+    "usd_is_base": true,
+    "description": "Mexican Peso (Mexico)"
+  },
+  "BRL": {
+    "type": "cross_rate",
+    "reference_code": 346,
+    "usd_is_base": true,
+    "description": "Brazilian Real (Brazil)"
+  },
+  "COP": {
+    "type": "cross_rate",
+    "reference_code": 345,
+    "usd_is_base": true,
+    "description": "Colombian Peso (Colombia)"
+  },
+  "ARS": {
+    "type": "cross_rate",
+    "reference_code": 344,
+    "usd_is_base": true,
+    "description": "Argentine Peso (Argentina)"
+  },
+  "CLP": {
+    "type": "cross_rate",
+    "reference_code": 3055,
+    "usd_is_base": true,
+    "description": "Chilean Peso (Chile)"
+  },
+  "PEN": {
+    "type": "cross_rate",
+    "reference_code": 3057,
+    "usd_is_base": true,
+    "description": "Peruvian Sol (Peru)"
+  },
+  "BOB": {
+    "type": "cross_rate",
+    "reference_code": 3054,
+    "usd_is_base": true,
+    "description": "Bolivian Boliviano (Bolivia)"
+  },
+  "UYU": {
+    "type": "cross_rate",
+    "reference_code": 84857,
+    "usd_is_base": true,
+    "description": "Uruguayan Peso (Uruguay)"
+  },
+  "DOP": {
+    "type": "cross_rate",
+    "reference_code": 3043,
+    "usd_is_base": true,
+    "description": "Dominican Peso (Dominican Republic)"
+  },
+  "GTQ": {
+    "type": "cross_rate",
+    "reference_code": 338,
+    "usd_is_base": true,
+    "description": "Guatemalan Quetzal (Guatemala)"
+  },
+  "HNL": {
+    "type": "cross_rate",
+    "reference_code": 339,
+    "usd_is_base": true,
+    "description": "Honduran Lempira (Honduras)"
+  },
+  "NIO": {
+    "type": "cross_rate",
+    "reference_code": 340,
+    "usd_is_base": true,
+    "description": "Nicaraguan Cordoba (Nicaragua)"
+  },
+  "RUB": {
+    "type": "cross_rate",
+    "reference_code": 3056,
+    "usd_is_base": true,
+    "description": "Russian Ruble (Russia)"
+  },
+  "VND": {
+    "type": "cross_rate",
+    "reference_code": 21766,
+    "usd_is_base": true,
+    "description": "Vietnamese Dong (Vietnam)"
+  },
+  "LKR": {
+    "type": "cross_rate",
+    "reference_code": 20873,
+    "usd_is_base": true,
+    "description": "Sri Lankan Rupee (Sri Lanka)"
+  },
+  "BDT": {
+    "type": "cross_rate",
+    "reference_code": 21251,
+    "usd_is_base": true,
+    "description": "Bangladeshi Taka (Bangladesh)"
+  }
+}

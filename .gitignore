@@ -1,0 +1,8 @@
+.env
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+*.db
+.DS_Store
+bruno/environments/local.bru

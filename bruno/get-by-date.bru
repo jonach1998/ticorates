@@ -1,0 +1,16 @@
+meta {
+  name: Get Rates by Date
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/rates
+  body: none
+  auth: none
+}
+
+params:query {
+  date: 2026-05-22
+  ~currency: USD
+}

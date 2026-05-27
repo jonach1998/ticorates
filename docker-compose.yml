@@ -1,0 +1,18 @@
+services:
+  ticorates:
+    image: jonach1998/ticorates:latest
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ticorates_data:/app/ticorates.db
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  ticorates_data:

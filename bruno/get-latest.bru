@@ -1,0 +1,15 @@
+meta {
+  name: Get Latest Rates
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/rates/latest
+  body: none
+  auth: none
+}
+
+params:query {
+  ~currency: USD
+}

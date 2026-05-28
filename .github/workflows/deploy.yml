@@ -20,6 +20,6 @@ jobs:
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
           script: |
-            docker compose -f ~/docker/ticorates/docker-compose.yml pull
-            docker compose -f ~/docker/ticorates/docker-compose.yml up -d
+            docker compose -f /home/jonach/docker-composers/ticorates/docker-compose.yml pull
+            docker compose -f /home/jonach/docker-composers/ticorates/docker-compose.yml up -d
             docker image prune -f

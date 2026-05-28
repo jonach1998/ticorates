@@ -1,6 +1,9 @@
 services:
   ticorates:
     image: jonach1998/ticorates:latest
+    container_name: ticorates
+    hostname: ticorates
+    
     ports:
       - "8000:8000"
     env_file: .env

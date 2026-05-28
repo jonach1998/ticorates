@@ -1,7 +1,8 @@
 [project]
-name = "ticorates"
+name = "ticorates-mcp"
 version = "1.0.0"
 description = "Public exchange rate API for Costa Rica, powered by BCCR"
+license = "MIT"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

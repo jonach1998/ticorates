@@ -33,6 +33,7 @@ class BCCRClient:
     def __init__(self, http_client: httpx.AsyncClient):
         self._client = http_client
         self._indicators = self._load_indicators()
+        self._semaphore = asyncio.Semaphore(5)
 
     async def fetch_rates_for_date(self, date: str) -> ExchangeRates:
         direct_rates = await self._fetch_direct_rates(date)
@@ -116,25 +117,28 @@ class BCCRClient:
     async def _request_with_retry(self, indicator_code: int, date: str) -> httpx.Response:
         bccr_date = date.replace("-", "/")
         for attempt in range(_MAX_RETRIES):
-            response = await self._client.get(
-                f"{settings.bccr_base_url}/indicadoresEconomicos/{indicator_code}/series",
-                params={"fechaInicio": bccr_date, "fechaFin": bccr_date, "idioma": "EN"},
-                headers={
-                    "Authorization": f"Bearer {settings.bccr_api_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/91.0.4472.124 Safari/537.36"
-                    ),
-                },
-                timeout=30,
-            )
-            if response.status_code == 429 and attempt < _MAX_RETRIES - 1:
-                wait = _BACKOFF_BASE**attempt
-                logger.warning("BCCR rate limit hit, retrying in %ds (attempt %d)", wait, attempt + 1)
-                await asyncio.sleep(wait)
-                continue
+            async with self._semaphore:
+                response = await self._client.get(
+                    f"{settings.bccr_base_url}/indicadoresEconomicos/{indicator_code}/series",
+                    params={"fechaInicio": bccr_date, "fechaFin": bccr_date, "idioma": "EN"},
+                    headers={
+                        "Authorization": f"Bearer {settings.bccr_api_key}",
+                        "Content-Type": "application/json",
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/91.0.4472.124 Safari/537.36"
+                        ),
+                    },
+                    timeout=30,
+                )
+            if response.status_code == 429:
+                if attempt < _MAX_RETRIES - 1:
+                    wait = _BACKOFF_BASE**attempt
+                    logger.warning("BCCR rate limit hit, retrying in %ds (attempt %d)", wait, attempt + 1)
+                    await asyncio.sleep(wait)
+                    continue
+                raise BCCRError(f"BCCR rate limit exceeded after {_MAX_RETRIES} retries")
             response.raise_for_status()
             return response
         raise BCCRError(f"BCCR rate limit exceeded after {_MAX_RETRIES} retries")

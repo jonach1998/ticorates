@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="TicoRates",
     description="Public exchange rate API for Costa Rica, powered by BCCR",
-    version=_version("ticorates"),
+    version=_version("ticorates-mcp"),
     lifespan=lifespan,
 )
 

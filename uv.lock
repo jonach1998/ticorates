@@ -708,7 +708,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ticorates"
+name = "ticorates-mcp"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

@@ -5,11 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/rates/latest
+  url: {{baseUrl}}/rates/latest?currency=USD
   body: none
   auth: none
 }
 
 params:query {
-  ~currency: USD
+  currency: USD
 }

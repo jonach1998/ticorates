@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/rates
+  url: {{baseUrl}}/rates?from=2026-05-01&to=2026-05-22&currency=USD
   body: none
   auth: none
 }
@@ -13,5 +13,5 @@ get {
 params:query {
   from: 2026-05-01
   to: 2026-05-22
-  ~currency: USD
+  currency: USD
 }

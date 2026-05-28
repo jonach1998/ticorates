@@ -4,8 +4,10 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - TZ=America/Costa_Rica
     volumes:
-      - ticorates_data:/app/ticorates.db
+      - ticorates_data:/app/data
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

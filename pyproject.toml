@@ -1,6 +1,6 @@
 [project]
 name = "ticorates-mcp"
-version = "1.0.3"
+version = "1.0.4"
 description = "Public exchange rate API for Costa Rica, powered by BCCR"
 license = "MIT"
 readme = "README.md"
@@ -35,6 +35,10 @@ packages = ["ticorates", "mcp_server"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 env = ["BCCR_API_KEY=test-api-key", "BCCR_BASE_URL=https://api.bccr.test"]
+addopts = "-m 'not stress'"
+markers = [
+    "stress: full integration tests against a live server and real BCCR API — run manually",
+]
 
 [tool.ruff]
 line-length = 120

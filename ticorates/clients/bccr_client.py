@@ -6,15 +6,22 @@ from pathlib import Path
 
 import httpx
 
-from ticorates.core.config import settings
-from ticorates.core.exceptions import BCCRError, UnsupportedCurrencyError
-from ticorates.models.domain import ExchangeRates, Rate
 from ticorates.clients.indicators import CrossRateConfig, DirectConfig, IndicatorType
+from ticorates.core.config import settings
+from ticorates.core.exceptions import BCCRError, NoDataError, UnsupportedCurrencyError
+from ticorates.core.single_flight import SingleFlight
+from ticorates.models.domain import ExchangeRates, Rate
 
 logger = logging.getLogger(__name__)
 
 _MAX_RETRIES = 3
 _BACKOFF_BASE = 2
+_BCCR_TIMEOUT = httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0)
+_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/91.0.4472.124 Safari/537.36"
+)
 
 
 class BCCRClient:
@@ -34,11 +41,7 @@ class BCCRClient:
         self._client = http_client
         self._indicators = self._load_indicators()
         self._semaphore = asyncio.Semaphore(5)
-
-    async def fetch_rates_for_date(self, date: str) -> ExchangeRates:
-        direct_rates = await self._fetch_direct_rates(date)
-        cross_rates = await self._fetch_cross_rates(date, direct_rates)
-        return ExchangeRates(date=date, rates={**direct_rates, **cross_rates})
+        self._single_flight = SingleFlight()
 
     async def fetch_rate_for_currency(self, currency: str, date: str) -> ExchangeRates:
         currency = currency.upper()
@@ -46,55 +49,19 @@ class BCCRClient:
         if currency not in self._indicators:
             raise UnsupportedCurrencyError(currency)
 
-        config = self._indicators[currency]
+        async def _fetch() -> ExchangeRates:
+            config = self._indicators[currency]
+            if config["type"] == IndicatorType.DIRECT:
+                rate = await self._fetch_direct_rate(config, date)  # type: ignore[arg-type]
+            else:
+                cross_config: CrossRateConfig = config  # type: ignore[assignment]
+                base_config: DirectConfig = self._indicators["USD"]  # type: ignore[assignment]
+                base_rate = await self._fetch_direct_rate(base_config, date)
+                reference_value = await self._fetch_indicator(cross_config["reference_code"], date)
+                rate = self._calculate_cross_rate(base_rate, reference_value, cross_config["usd_is_base"])
+            return ExchangeRates(date=date, rates={currency: rate})
 
-        if config["type"] == IndicatorType.DIRECT:
-            direct_config: DirectConfig = config  # type: ignore[assignment]
-            rate = await self._fetch_direct_rate(direct_config, date)
-        else:
-            cross_config: CrossRateConfig = config  # type: ignore[assignment]
-            base_config: DirectConfig = self._indicators["USD"]  # type: ignore[assignment]
-            base_rate = await self._fetch_direct_rate(base_config, date)
-            reference_value = await self._fetch_indicator(cross_config["reference_code"], date)
-            rate = self._calculate_cross_rate(base_rate, reference_value, cross_config["usd_is_base"])
-
-        return ExchangeRates(date=date, rates={currency: rate})
-
-    async def _fetch_direct_rates(self, date: str) -> dict[str, Rate]:
-        direct_items = [
-            (currency, config)
-            for currency, config in self._indicators.items()
-            if config["type"] == IndicatorType.DIRECT
-        ]
-        results = await asyncio.gather(*[self._fetch_direct_rate(config, date) for _, config in direct_items])  # type: ignore[arg-type]
-        return {currency: rate for (currency, _), rate in zip(direct_items, results)}
-
-    async def _fetch_cross_rates(self, date: str, direct_rates: dict[str, Rate]) -> dict[str, Rate]:
-        cross_items = [
-            (currency, config)
-            for currency, config in self._indicators.items()
-            if config["type"] == IndicatorType.CROSS_RATE
-        ]
-        reference_values = await asyncio.gather(
-            *[self._fetch_indicator(config["reference_code"], date) for _, config in cross_items]
-        )
-        return {
-            currency: self._calculate_cross_rate(
-                direct_rates["USD"], reference_value, config["usd_is_base"]
-            )
-            for (currency, config), reference_value in zip(cross_items, reference_values)
-        }
-
-    def _calculate_cross_rate(self, base_rate: Rate, reference_value: float, usd_is_base: bool) -> Rate:
-        if usd_is_base:
-            return Rate(
-                purchase=round(base_rate.purchase / reference_value, 2),
-                sale=round(base_rate.sale / reference_value, 2),
-            )
-        return Rate(
-            purchase=round(reference_value * base_rate.purchase, 2),
-            sale=round(reference_value * base_rate.sale, 2),
-        )
+        return await self._single_flight.execute(f"currency:{currency}:{date}", _fetch())
 
     def enrich_descriptions(self, exchange_rates: ExchangeRates) -> ExchangeRates:
         enriched_rates = {
@@ -114,47 +81,64 @@ class BCCRClient:
         )
         return Rate(purchase=purchase, sale=sale)
 
-    async def _request_with_retry(self, indicator_code: int, date: str) -> httpx.Response:
-        bccr_date = date.replace("-", "/")
-        for attempt in range(_MAX_RETRIES):
-            async with self._semaphore:
-                response = await self._client.get(
-                    f"{settings.bccr_base_url}/indicadoresEconomicos/{indicator_code}/series",
-                    params={"fechaInicio": bccr_date, "fechaFin": bccr_date, "idioma": "EN"},
-                    headers={
-                        "Authorization": f"Bearer {settings.bccr_api_key}",
-                        "Content-Type": "application/json",
-                        "User-Agent": (
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/91.0.4472.124 Safari/537.36"
-                        ),
-                    },
-                    timeout=30,
-                )
-            if response.status_code == 429:
-                if attempt < _MAX_RETRIES - 1:
-                    wait = _BACKOFF_BASE**attempt
-                    logger.warning("BCCR rate limit hit, retrying in %ds (attempt %d)", wait, attempt + 1)
-                    await asyncio.sleep(wait)
-                    continue
-                raise BCCRError(f"BCCR rate limit exceeded after {_MAX_RETRIES} retries")
-            response.raise_for_status()
-            return response
-        raise BCCRError(f"BCCR rate limit exceeded after {_MAX_RETRIES} retries")
+    def _calculate_cross_rate(self, base_rate: Rate, reference_value: float, usd_is_base: bool) -> Rate:
+        if usd_is_base:
+            return Rate(
+                purchase=round(base_rate.purchase / reference_value, 2),
+                sale=round(base_rate.sale / reference_value, 2),
+            )
+        return Rate(
+            purchase=round(reference_value * base_rate.purchase, 2),
+            sale=round(reference_value * base_rate.sale, 2),
+        )
 
     async def _fetch_indicator(self, indicator_code: int, date: str) -> float:
         logger.debug("Fetching indicator %s from BCCR for date %s", indicator_code, date)
         response = await self._request_with_retry(indicator_code, date)
-        payload = response.json()
+        bccr_response = response.json()
 
-        if not payload.get("estado"):
-            raise BCCRError(f"BCCR API error: {payload.get('mensaje')}")
+        if not bccr_response.get("estado"):
+            raise BCCRError(f"BCCR API error: {bccr_response.get('mensaje')}")
 
-        response_data = payload.get("datos", [])
-        series = response_data[0].get("series", []) if response_data else []
+        indicator_entries = bccr_response.get("datos", [])
+        first_entry = indicator_entries[0] if indicator_entries else {}
+        series = first_entry.get("series", [])
 
         if not series:
-            raise BCCRError(f"No data from BCCR for indicator {indicator_code} on {date}")
+            raise NoDataError(date)
 
-        return series[0]["valorDatoPorPeriodo"]
+        rate_value = series[0]["valorDatoPorPeriodo"]
+        if rate_value is None:
+            raise NoDataError(date)
+
+        return float(rate_value)
+
+    async def _request_with_retry(self, indicator_code: int, date: str) -> httpx.Response:
+        bccr_date = date.replace("-", "/")
+        for attempt in range(_MAX_RETRIES):
+            try:
+                async with self._semaphore:
+                    response = await self._client.get(
+                        f"{settings.bccr_base_url}/indicadoresEconomicos/{indicator_code}/series",
+                        params={"fechaInicio": bccr_date, "fechaFin": bccr_date, "idioma": "EN"},
+                        headers={
+                            "Authorization": f"Bearer {settings.bccr_api_key}",
+                            "Content-Type": "application/json",
+                            "User-Agent": _USER_AGENT,
+                        },
+                        timeout=_BCCR_TIMEOUT,
+                    )
+            except httpx.TimeoutException as exc:
+                raise BCCRError("BCCR request timed out (connect=5s, read=60s)") from exc
+            if response.status_code == 429:
+                if attempt < _MAX_RETRIES - 1:
+                    backoff_seconds = _BACKOFF_BASE**attempt
+                    logger.warning("BCCR rate limit hit, retrying in %ds (attempt %d)", backoff_seconds, attempt + 1)
+                    await asyncio.sleep(backoff_seconds)
+                    continue
+                raise BCCRError(f"BCCR rate limit exceeded after {_MAX_RETRIES} retries", upstream_status=429)
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise BCCRError("BCCR upstream error", upstream_status=exc.response.status_code) from exc
+            return response

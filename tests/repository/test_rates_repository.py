@@ -17,36 +17,19 @@ def make_row(date: str, currency: str, purchase: float, sale: float) -> MagicMoc
     return row
 
 
-# --- get_rates_for_date ---
-
-
 def test_get_rates_for_date_empty_returns_none():
     session = make_session()
     session.exec.return_value.all.return_value = []
-    assert RatesRepository(session).get_rates_for_date("2024-01-15") is None
+    assert RatesRepository(session).get_rates_for_date("2024-01-15", "USD") is None
 
 
 def test_get_rates_for_date_maps_rows_to_domain():
     session = make_session()
     session.exec.return_value.all.return_value = [make_row("2024-01-15", "USD", 500.0, 510.0)]
-    result = RatesRepository(session).get_rates_for_date("2024-01-15")
+    result = RatesRepository(session).get_rates_for_date("2024-01-15", "USD")
     assert result.date == "2024-01-15"
     assert result.rates["USD"].purchase == 500.0
     assert result.rates["USD"].sale == 510.0
-
-
-def test_get_rates_for_date_multiple_currencies():
-    session = make_session()
-    session.exec.return_value.all.return_value = [
-        make_row("2024-01-15", "USD", 500.0, 510.0),
-        make_row("2024-01-15", "EUR", 550.0, 560.0),
-    ]
-    result = RatesRepository(session).get_rates_for_date("2024-01-15")
-    assert "USD" in result.rates
-    assert "EUR" in result.rates
-
-
-# --- save_rates ---
 
 
 def test_save_rates_commits():
@@ -70,23 +53,20 @@ def test_save_rates_one_execute_per_currency():
     assert session.execute.call_count == 3
 
 
-# --- get_rates_for_date_range ---
-
-
 def test_get_rates_for_date_range_empty_returns_empty_list():
     session = make_session()
     session.exec.return_value.all.return_value = []
-    assert RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17") == []
+    assert RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17", "USD") == []
 
 
-def test_get_rates_for_date_range_groups_by_date():
+def test_get_rates_for_date_range_returns_entry_per_date():
     session = make_session()
     session.exec.return_value.all.return_value = [
         make_row("2024-01-15", "USD", 500.0, 510.0),
         make_row("2024-01-16", "USD", 502.0, 512.0),
         make_row("2024-01-17", "USD", 504.0, 514.0),
     ]
-    results = RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17")
+    results = RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17", "USD")
     assert len(results) == 3
 
 
@@ -97,5 +77,5 @@ def test_get_rates_for_date_range_sorted_by_date():
         make_row("2024-01-15", "USD", 500.0, 510.0),
         make_row("2024-01-16", "USD", 502.0, 512.0),
     ]
-    results = RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17")
+    results = RatesRepository(session).get_rates_for_date_range("2024-01-15", "2024-01-17", "USD")
     assert [r.date for r in results] == ["2024-01-15", "2024-01-16", "2024-01-17"]

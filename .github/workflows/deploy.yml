@@ -2,17 +2,18 @@ name: Deploy to Raspberry Pi
 
 on:
   workflow_run:
-    workflows: ["Publish Docker image"]
+    workflows: ["Test & Publish"]
     types:
       - completed
   workflow_dispatch:
 
 jobs:
   deploy:
+    name: Pull image and restart container
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Deploy to Raspberry Pi
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.PI_HOST }}
@@ -20,6 +21,7 @@ jobs:
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
           script: |
-            docker compose -f /home/jonach/docker-composers/ticorates/docker-compose.yml pull
-            docker compose -f /home/jonach/docker-composers/ticorates/docker-compose.yml up -d
+            cd /home/jonach/docker-composers/ticorates
+            docker compose pull
+            docker compose up -d
             docker image prune -f

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from mcp_server.server import (
+    TicoRatesAPIError,
     convert_amount,
     get_historical_average,
     get_latest_rates,
@@ -14,28 +15,29 @@ from mcp_server.server import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def make_response(data) -> MagicMock:
     response = MagicMock()
+    response.is_success = True
     response.json.return_value = data
+    return response
+
+
+def make_error_response(status_code: int, detail: str) -> MagicMock:
+    response = MagicMock()
+    response.is_success = False
+    response.status_code = status_code
+    response.json.return_value = {"detail": detail}
     return response
 
 
 @contextmanager
 def patched_httpx(*responses):
-    """
-    Patches httpx.AsyncClient so MCP tools don't make real HTTP calls.
-    Pass one response-data dict per expected .get() call.
-    Yields the inner async mock so tests can inspect call args.
-    """
     mock_client = AsyncMock()
-    if len(responses) == 1:
-        mock_client.get.return_value = make_response(responses[0])
+    resolved = [r if isinstance(r, MagicMock) else make_response(r) for r in responses]
+    if len(resolved) == 1:
+        mock_client.get.return_value = resolved[0]
     else:
-        mock_client.get.side_effect = [make_response(r) for r in responses]
+        mock_client.get.side_effect = resolved
 
     with patch("httpx.AsyncClient") as mock_class:
         instance = MagicMock()
@@ -45,27 +47,24 @@ def patched_httpx(*responses):
         yield mock_client
 
 
-# ---------------------------------------------------------------------------
-# Fixtures / shared data
-# ---------------------------------------------------------------------------
-
 CURRENCIES = {
     "USD": "United States Dollar",
     "EUR": "Euro (European Union)",
 }
 
-RATES = {
+RATES_USD = {
     "date": "2025-05-27",
     "rates": {
         "USD": {"purchase": 512.50, "sale": 519.75, "description": "United States Dollar"},
-        "EUR": {"purchase": 553.00, "sale": 561.00, "description": "Euro (European Union)"},
     },
 }
 
-
-# ---------------------------------------------------------------------------
-# get_supported_currencies
-# ---------------------------------------------------------------------------
+RATES_EUR = {
+    "date": "2025-05-27",
+    "rates": {
+        "EUR": {"purchase": 553.00, "sale": 561.00, "description": "Euro (European Union)"},
+    },
+}
 
 
 @pytest.mark.asyncio
@@ -83,78 +82,43 @@ async def test_get_supported_currencies_hits_correct_endpoint():
     assert url.endswith("/currencies")
 
 
-# ---------------------------------------------------------------------------
-# get_latest_rates
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_get_latest_rates_returns_all():
-    with patched_httpx(RATES) as mock_client:
-        result = await get_latest_rates()
-    assert result == RATES
-    params = mock_client.get.call_args.kwargs.get("params", {})
-    assert "currency" not in params
-
-
 @pytest.mark.asyncio
 async def test_get_latest_rates_passes_currency():
-    with patched_httpx(RATES) as mock_client:
-        await get_latest_rates("USD")
+    with patched_httpx(RATES_USD) as mock_client:
+        result = await get_latest_rates("USD")
+    assert result == RATES_USD
     params = mock_client.get.call_args.kwargs["params"]
     assert params["currency"] == "USD"
 
 
-# ---------------------------------------------------------------------------
-# get_rates_for_date
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_latest_rates_hits_latest_endpoint():
+    with patched_httpx(RATES_USD) as mock_client:
+        await get_latest_rates("USD")
+    url = mock_client.get.call_args.args[0]
+    assert url.endswith("/rates/latest")
 
 
 @pytest.mark.asyncio
-async def test_get_rates_for_date_passes_date():
-    with patched_httpx(RATES) as mock_client:
-        result = await get_rates_for_date("2025-05-27")
-    assert result == RATES
+async def test_get_rates_for_date_passes_date_and_currency():
+    with patched_httpx(RATES_USD) as mock_client:
+        result = await get_rates_for_date("2025-05-27", "USD")
+    assert result == RATES_USD
     params = mock_client.get.call_args.kwargs["params"]
     assert params["date"] == "2025-05-27"
-    assert "currency" not in params
+    assert params["currency"] == "USD"
 
 
 @pytest.mark.asyncio
-async def test_get_rates_for_date_passes_currency():
-    with patched_httpx(RATES) as mock_client:
-        await get_rates_for_date("2025-05-27", "EUR")
-    params = mock_client.get.call_args.kwargs["params"]
-    assert params["currency"] == "EUR"
-
-
-# ---------------------------------------------------------------------------
-# get_rates_for_date_range
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_get_rates_for_date_range_passes_from_to():
-    range_data = [RATES, RATES]
+async def test_get_rates_for_date_range_passes_from_to_currency():
+    range_data = [RATES_USD, RATES_USD]
     with patched_httpx(range_data) as mock_client:
-        result = await get_rates_for_date_range("2025-05-01", "2025-05-27")
+        result = await get_rates_for_date_range("2025-05-01", "2025-05-27", "USD")
     assert result == range_data
     params = mock_client.get.call_args.kwargs["params"]
     assert params["from"] == "2025-05-01"
     assert params["to"] == "2025-05-27"
-
-
-@pytest.mark.asyncio
-async def test_get_rates_for_date_range_passes_currency():
-    with patched_httpx([RATES]) as mock_client:
-        await get_rates_for_date_range("2025-05-01", "2025-05-27", "USD")
-    params = mock_client.get.call_args.kwargs["params"]
     assert params["currency"] == "USD"
-
-
-# ---------------------------------------------------------------------------
-# convert_amount
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -165,36 +129,45 @@ async def test_convert_same_currency_skips_http():
 
 
 @pytest.mark.asyncio
-async def test_convert_usd_to_crc():
-    with patched_httpx(RATES):
+async def test_convert_usd_to_crc_fetches_only_usd():
+    """CRC is the target — only USD rate needed (1 API call)."""
+    with patched_httpx(RATES_USD) as mock_client:
         result = await convert_amount(100.0, "USD", "CRC")
-    expected = round(100.0 * RATES["rates"]["USD"]["purchase"], 2)
+    assert mock_client.get.call_count == 1
+    params = mock_client.get.call_args.kwargs["params"]
+    assert params["currency"] == "USD"
+    expected = round(100.0 * RATES_USD["rates"]["USD"]["purchase"], 2)
     assert result["to"]["amount"] == expected
     assert result["from"]["currency"] == "USD"
     assert result["to"]["currency"] == "CRC"
 
 
 @pytest.mark.asyncio
-async def test_convert_crc_to_usd():
-    with patched_httpx(RATES):
+async def test_convert_crc_to_usd_fetches_only_usd():
+    """CRC is the source — only USD rate needed (1 API call)."""
+    with patched_httpx(RATES_USD) as mock_client:
         result = await convert_amount(50_000.0, "CRC", "USD")
-    expected = round(50_000.0 / RATES["rates"]["USD"]["sale"], 2)
+    assert mock_client.get.call_count == 1
+    params = mock_client.get.call_args.kwargs["params"]
+    assert params["currency"] == "USD"
+    expected = round(50_000.0 / RATES_USD["rates"]["USD"]["sale"], 2)
     assert result["to"]["amount"] == expected
 
 
 @pytest.mark.asyncio
-async def test_convert_cross_currency_via_crc():
-    """EUR → USD: (amount × EUR purchase) / USD sale."""
-    with patched_httpx(RATES):
+async def test_convert_cross_currency_fetches_both_in_parallel():
+    """EUR → USD: needs both currencies — 2 parallel API calls."""
+    with patched_httpx(RATES_EUR, RATES_USD) as mock_client:
         result = await convert_amount(100.0, "EUR", "USD")
-    crc = 100.0 * RATES["rates"]["EUR"]["purchase"]
-    expected = round(crc / RATES["rates"]["USD"]["sale"], 2)
+    assert mock_client.get.call_count == 2
+    crc = 100.0 * RATES_EUR["rates"]["EUR"]["purchase"]
+    expected = round(crc / RATES_USD["rates"]["USD"]["sale"], 2)
     assert result["to"]["amount"] == expected
 
 
 @pytest.mark.asyncio
 async def test_convert_with_date_passes_date_param():
-    with patched_httpx(RATES) as mock_client:
+    with patched_httpx(RATES_USD) as mock_client:
         await convert_amount(100.0, "USD", "CRC", date="2025-01-15")
     params = mock_client.get.call_args.kwargs["params"]
     assert params["date"] == "2025-01-15"
@@ -202,15 +175,11 @@ async def test_convert_with_date_passes_date_param():
 
 @pytest.mark.asyncio
 async def test_convert_without_date_hits_latest_endpoint():
-    with patched_httpx(RATES) as mock_client:
+    with patched_httpx(RATES_USD) as mock_client:
         await convert_amount(100.0, "USD", "CRC")
     url = mock_client.get.call_args.args[0]
     assert url.endswith("/rates/latest")
 
-
-# ---------------------------------------------------------------------------
-# get_rate_change
-# ---------------------------------------------------------------------------
 
 RATES_JAN = {"date": "2025-01-01", "rates": {"USD": {"purchase": 500.0, "sale": 510.0}}}
 RATES_FEB = {"date": "2025-02-01", "rates": {"USD": {"purchase": 515.0, "sale": 525.0}}}
@@ -249,11 +218,6 @@ async def test_get_rate_change_makes_two_calls():
     assert mock_client.get.call_count == 2
 
 
-# ---------------------------------------------------------------------------
-# get_historical_average
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_get_historical_average():
     entries = [
@@ -277,3 +241,19 @@ async def test_get_historical_average_empty_returns_none():
 
     assert result["days"] == 0
     assert result["average"] is None
+
+
+@pytest.mark.asyncio
+async def test_api_error_surfaces_detail_message():
+    error = make_error_response(404, "No exchange rate data published by BCCR for 2024-01-01")
+    with patched_httpx(error):
+        with pytest.raises(TicoRatesAPIError, match="No exchange rate data published by BCCR") as exc_info:
+            await get_rates_for_date("2024-01-01", "USD")
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_convert_unsupported_currency_raises_value_error():
+    with patched_httpx(RATES_USD):
+        with pytest.raises(ValueError, match="'XYZ'"):
+            await convert_amount(100.0, "XYZ", "CRC")

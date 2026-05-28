@@ -18,7 +18,7 @@ async def get_supported_currencies():
 
 @rates_router.get("/latest", response_model=ExchangeRates)
 async def get_latest_rates(
-    currency: str | None = Query(default=None, description="Currency code (e.g. USD, EUR)"),
+    currency: str = Query(description="Currency code (e.g. USD, EUR)"),
     service: RatesService = Depends(get_rates_service),
 ):
     return await service.get_latest_rates(currency)
@@ -26,10 +26,10 @@ async def get_latest_rates(
 
 @rates_router.get("", response_model=ExchangeRates | list[ExchangeRates])
 async def get_rates(
+    currency: str = Query(description="Currency code (e.g. USD, EUR)"),
     date: Date | None = Query(default=None, description="Single date (YYYY-MM-DD)"),
     from_date: Date | None = Query(default=None, alias="from", description="Start date (YYYY-MM-DD)"),
     to_date: Date | None = Query(default=None, alias="to", description="End date (YYYY-MM-DD)"),
-    currency: str | None = Query(default=None, description="Currency code (e.g. USD, EUR)"),
     service: RatesService = Depends(get_rates_service),
 ):
     if from_date and to_date:

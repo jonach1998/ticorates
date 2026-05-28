@@ -7,8 +7,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from ticorates.api.routes import currencies_router, rates_router
+from ticorates.clients.bccr_client import BCCRClient
 from ticorates.core.database import create_tables
-from ticorates.core.exceptions import BCCRError, UnsupportedCurrencyError
+from ticorates.core.exceptions import BCCRError, NoDataError, UnsupportedCurrencyError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,7 +21,7 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     create_tables()
     async with httpx.AsyncClient() as http_client:
-        app.state.http_client = http_client
+        app.state.bccr_client = BCCRClient(http_client)
         yield
 
 
@@ -47,4 +48,12 @@ async def unsupported_currency_handler(request: Request, exc: UnsupportedCurrenc
 
 @app.exception_handler(BCCRError)
 async def bccr_error_handler(request: Request, exc: BCCRError) -> JSONResponse:
-    return JSONResponse(status_code=502, content={"detail": str(exc)})
+    content: dict = {"detail": str(exc)}
+    if exc.upstream_status is not None:
+        content["upstream_status"] = exc.upstream_status
+    return JSONResponse(status_code=502, content=content)
+
+
+@app.exception_handler(NoDataError)
+async def no_data_handler(request: Request, exc: NoDataError) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": str(exc)})

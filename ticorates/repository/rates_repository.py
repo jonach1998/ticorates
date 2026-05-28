@@ -9,12 +9,12 @@ class RatesRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def get_rates_for_date(self, date: str, currency: str | None = None) -> ExchangeRates | None:
-        query = select(CachedRate).where(CachedRate.date == date)
-
-        if currency:
-            query = query.where(CachedRate.currency == currency.upper())
-
+    def get_rates_for_date(self, date: str, currency: str) -> ExchangeRates | None:
+        query = (
+            select(CachedRate)
+            .where(CachedRate.date == date)
+            .where(CachedRate.currency == currency.upper())
+        )
         cached_rates = self.session.exec(query).all()
 
         if not cached_rates:
@@ -25,7 +25,7 @@ class RatesRepository:
 
     def save_rates(self, exchange_rates: ExchangeRates) -> None:
         for currency, rate in exchange_rates.rates.items():
-            stmt = (
+            upsert_stmt = (
                 insert(CachedRate)
                 .values(
                     date=exchange_rates.date,
@@ -35,25 +35,20 @@ class RatesRepository:
                 )
                 .on_conflict_do_nothing(index_elements=["date", "currency"])
             )
-            self.session.execute(stmt)
+            self.session.execute(upsert_stmt)
 
         self.session.commit()
 
-    def get_rates_for_date_range(self, from_date: str, to_date: str, currency: str | None = None) -> list[ExchangeRates]:
-        query = select(CachedRate).where(
-            CachedRate.date >= from_date,
-            CachedRate.date <= to_date,
+    def get_rates_for_date_range(self, from_date: str, to_date: str, currency: str) -> list[ExchangeRates]:
+        query = (
+            select(CachedRate)
+            .where(CachedRate.date >= from_date)
+            .where(CachedRate.date <= to_date)
+            .where(CachedRate.currency == currency.upper())
         )
-
-        if currency:
-            query = query.where(CachedRate.currency == currency.upper())
-
         cached_rates = self.session.exec(query).all()
 
-        rates_by_date: dict[str, dict[str, Rate]] = {}
-        for row in cached_rates:
-            if row.date not in rates_by_date:
-                rates_by_date[row.date] = {}
-            rates_by_date[row.date][row.currency] = Rate(purchase=row.purchase, sale=row.sale)
-
-        return [ExchangeRates(date=date, rates=rates) for date, rates in sorted(rates_by_date.items())]
+        return [
+            ExchangeRates(date=row.date, rates={row.currency: Rate(purchase=row.purchase, sale=row.sale)})
+            for row in sorted(cached_rates, key=lambda r: r.date)
+        ]

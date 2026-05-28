@@ -1,15 +1,51 @@
-# TicoRates
+# TicoRates 🇨🇷
 
-Public exchange rate API for Costa Rica, powered by [BCCR](https://www.bccr.fi.cr/) (Banco Central de Costa Rica). Supports 43 currencies with on-demand caching and a built-in MCP server for AI assistants.
+[![Test & Publish](https://github.com/jonach1998/ticorates/actions/workflows/test-and-publish.yml/badge.svg)](https://github.com/jonach1998/ticorates/actions/workflows/test-and-publish.yml)
+[![PyPI](https://img.shields.io/pypi/v/ticorates-mcp)](https://pypi.org/project/ticorates-mcp/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jonach1998/ticorates)](https://hub.docker.com/r/jonach1998/ticorates)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-- **REST API** — Simple HTTP endpoints, no authentication required
+Free, open exchange rate API for Costa Rica — powered by BCCR. No sign-up, no token, ready to use.
+
+**Live server → `https://ticorates.dev` — free for everyone, no API key required.**
+
+## How it works
+
+1. **Request** — you call any endpoint with a date and currency code.
+2. **Cache check** — if the rate is already in the database, it's returned instantly.
+3. **BCCR fetch** — on a cache miss, rates are fetched from Banco Central de Costa Rica in real time.
+4. **Store & serve** — the result is cached in SQLite for all future requests to the same date.
+
+Historical dates are served from cache after the first request. Concurrent requests for the same date are deduplicated — only one BCCR call is made regardless of how many clients ask simultaneously.
+
+## Try it now
+
+No installation. No registration. Paste and run:
+
+```bash
+# Today's USD rate
+curl "https://ticorates.dev/rates/latest?currency=USD"
+
+# Rate on a specific date
+curl "https://ticorates.dev/rates?date=2025-01-15&currency=USD"
+
+# Last 30 days
+curl "https://ticorates.dev/rates?from=2025-04-01&to=2025-04-30&currency=USD"
+
+# All supported currencies
+curl https://ticorates.dev/currencies
+```
+
+Interactive docs → **[ticorates.dev/docs](https://ticorates.dev/docs)**
+
+## Features
+
+- **REST API** — simple HTTP endpoints, no authentication required
 - **43 currencies** — USD, EUR, GBP, JPY, CAD, AUD, CHF, and more
 - **On-demand caching** — rates are fetched from BCCR on first request and served instantly after
 - **Historical rates** — query any date or date range going back years
 - **MCP server** — native integration with Claude, Cursor, Windsurf, and other AI tools
 - **Self-hosted** — Docker image available for `linux/amd64` and `linux/arm64`
-
----
 
 ## Table of Contents
 
@@ -24,8 +60,6 @@ Public exchange rate API for Costa Rica, powered by [BCCR](https://www.bccr.fi.c
 
 **Base URL:** `https://ticorates.dev`  
 **Interactive docs:** `https://ticorates.dev/docs`
-
----
 
 ### `GET /currencies`
 
@@ -46,18 +80,15 @@ GET /currencies
 }
 ```
 
----
-
 ### `GET /rates/latest`
 
-Returns today's exchange rates from BCCR. Omit `currency` to get all 43 currencies at once.
+Returns today's exchange rate from BCCR for a specific currency.
 
 | Parameter  | Type   | Required | Description                           |
 |------------|--------|----------|---------------------------------------|
-| `currency` | string | No       | Filter to a single code (e.g. `USD`)  |
+| `currency` | string | **Yes**  | Currency code (e.g. `USD`, `EUR`)     |
 
 ```
-GET /rates/latest
 GET /rates/latest?currency=USD
 ```
 
@@ -76,25 +107,21 @@ GET /rates/latest?currency=USD
 }
 ```
 
----
-
 ### `GET /rates`
 
 Returns rates for a specific date or date range. Provide either `date` or both `from` + `to`.
 
 | Parameter  | Type   | Required | Description                             |
 |------------|--------|----------|-----------------------------------------|
+| `currency` | string | **Yes**  | Currency code (e.g. `USD`, `EUR`)       |
 | `date`     | string | No*      | Single date in `YYYY-MM-DD` format      |
 | `from`     | string | No*      | Start of range in `YYYY-MM-DD` format   |
 | `to`       | string | No*      | End of range in `YYYY-MM-DD` format     |
-| `currency` | string | No       | Filter to a single code (e.g. `EUR`)    |
 
 *Either `date` or both `from` + `to` must be provided.
 
 ```
-GET /rates?date=2025-01-15
 GET /rates?date=2025-01-15&currency=EUR
-GET /rates?from=2025-01-01&to=2025-01-31
 GET /rates?from=2025-01-01&to=2025-01-31&currency=USD
 ```
 
@@ -106,8 +133,7 @@ A single-date request returns an object. A date-range request returns an array s
 {
   "date": "2025-01-15",
   "rates": {
-    "USD": { "purchase": 510.25, "sale": 517.50, "description": "United States Dollar" },
-    "EUR": { "purchase": 552.00, "sale": 560.30, "description": "Euro (European Union)" }
+    "USD": { "purchase": 510.25, "sale": 517.50, "description": "United States Dollar" }
   }
 }
 ```
@@ -127,7 +153,16 @@ A single-date request returns an object. A date-range request returns an array s
 ]
 ```
 
----
+### Weekends & holidays
+
+BCCR only publishes rates on business days. TicoRates handles this transparently:
+
+- **Single date** — if you request a weekend or holiday, the API returns the most
+  recent business day's rate (looking back up to a week). The `date` field in the
+  response reflects the **actual** date returned, not the one requested. Requesting
+  `?date=2025-05-25` (Sunday) returns `{ "date": "2025-05-23", ... }`.
+- **Date range** — days with no published data are simply omitted from the array,
+  so a 14-day range may return fewer than 14 entries.
 
 ### `GET /health`
 
@@ -137,35 +172,39 @@ Health check endpoint. Returns `200 OK` when the service is running.
 { "status": "ok" }
 ```
 
----
-
 ### Error responses
 
-| Status | Condition                                           |
-|--------|-----------------------------------------------------|
-| `400`  | Missing required parameters or unsupported currency |
-| `422`  | Invalid date format (must be `YYYY-MM-DD`)          |
-| `502`  | BCCR upstream error                                 |
+| Status | Condition                                                       |
+|--------|-----------------------------------------------------------------|
+| `400`  | Unsupported currency, or `date` / `from`+`to` not provided     |
+| `404`  | No BCCR data published for the requested date                  |
+| `422`  | Missing required `currency` parameter, or invalid date format  |
+| `502`  | BCCR upstream error (rate limit or service unavailable)        |
 
 ---
 
 ## MCP Server
 
-TicoRates includes an [MCP](https://modelcontextprotocol.io/) server that gives AI assistants direct access to Costa Rican exchange rates. No API key required — it connects to `https://ticorates.dev` by default.
+> **No API key required.** The MCP server connects to `https://ticorates.dev` by default — install it and it just works.
+
+TicoRates includes an [MCP](https://modelcontextprotocol.io/) server that gives AI assistants direct access to Costa Rican exchange rates. Ask your AI questions like:
+
+- *"What's today's dollar rate in Costa Rica?"*
+- *"How much has the euro changed this month?"*
+- *"Convert 500 USD to colones using today's rate."*
+- *"What was the average dollar rate in Q1 2025?"*
 
 ### Available tools
 
 | Tool                       | Description                                      |
 |----------------------------|--------------------------------------------------|
 | `get_supported_currencies` | List all available currency codes and names      |
-| `get_latest_rates`         | Today's rates for one or all currencies          |
-| `get_rates_for_date`       | Historical rates for a specific date             |
+| `get_latest_rates`         | Today's rate for a specific currency             |
+| `get_rates_for_date`       | Historical rate for a specific date              |
 | `get_rates_for_date_range` | Rates for a date range, one entry per day        |
 | `convert_amount`           | Convert between any two currencies               |
 | `get_rate_change`          | Absolute and percentage change between two dates |
 | `get_historical_average`   | Average purchase/sale rate over a period         |
-
----
 
 ### Setup
 
@@ -189,8 +228,6 @@ Edit `claude_desktop_config.json` and restart Claude Desktop.
 }
 ```
 
----
-
 #### Claude Code
 
 Run once in your terminal:
@@ -198,21 +235,6 @@ Run once in your terminal:
 ```bash
 claude mcp add ticorates -- uvx ticorates-mcp
 ```
-
-Or add it manually to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "ticorates": {
-      "command": "uvx",
-      "args": ["ticorates-mcp"]
-    }
-  }
-}
-```
-
----
 
 #### Cursor
 
@@ -231,8 +253,6 @@ Add to `~/.cursor/mcp.json`:
 
 Or go to **Settings → Cursor Settings → Features → MCP → Add MCP Server**.
 
----
-
 #### Windsurf
 
 Open the Cascade panel → **⚙ Settings → MCP Servers → Add**, then enter:
@@ -240,37 +260,19 @@ Open the Cascade panel → **⚙ Settings → MCP Servers → Add**, then enter:
 - **Command:** `uvx`
 - **Args:** `ticorates-mcp`
 
----
-
 #### OpenAI Codex CLI
-
-Run once in your terminal:
 
 ```bash
 codex mcp add ticorates -- uvx ticorates-mcp
 ```
 
-Or add it manually to `~/.codex/config.toml` (global) or `.codex/config.toml` (project-scoped):
-
-```toml
-[mcp_servers.ticorates]
-command = "uvx"
-args = ["ticorates-mcp"]
-```
-
----
-
 #### Other clients
 
-Any MCP-compatible client that supports `stdio` transport works with TicoRates. Use the same config structure shown above.
-
----
+Any MCP-compatible client that supports `stdio` transport works with TicoRates. Use the same JSON config structure shown above.
 
 ### Pointing the MCP at a self-hosted instance
 
-By default, `ticorates-mcp` connects to `https://ticorates.dev`. If you're running your own instance, override it with the `TICORATES_BASE_URL` environment variable in your client's config.
-
-**Claude Desktop / Claude Code / Cursor / Windsurf** (`JSON`):
+By default, `ticorates-mcp` connects to `https://ticorates.dev`. To use your own instance, set `TICORATES_BASE_URL` in your client's config:
 
 ```json
 {
@@ -284,21 +286,6 @@ By default, `ticorates-mcp` connects to `https://ticorates.dev`. If you're runni
     }
   }
 }
-```
-
-**OpenAI Codex CLI** (`config.toml`):
-
-```toml
-[mcp_servers.ticorates]
-command = "uvx"
-args = ["ticorates-mcp"]
-env = { TICORATES_BASE_URL = "http://your-server:8000" }
-```
-
-Or via CLI:
-
-```bash
-codex mcp add ticorates --env TICORATES_BASE_URL=http://your-server:8000 -- uvx ticorates-mcp
 ```
 
 ---
@@ -321,8 +308,10 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - TZ=America/Costa_Rica
     volumes:
-      - ticorates_data:/app/ticorates.db
+      - ticorates_data:/app/data
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -340,6 +329,9 @@ volumes:
 ```env
 BCCR_API_KEY=your_token_here
 BCCR_BASE_URL=https://apim.bccr.fi.cr/SDDE/api/Bccr.GE.SDDE.Publico.Indicadores.API
+
+# Optional — change the SQLite database path (default: /app/data/ticorates.db)
+# DATABASE_URL=sqlite:////custom/path/ticorates.db
 ```
 
 **3. Start the service:**
@@ -372,6 +364,17 @@ uv run uvicorn ticorates.main:app --reload
 # Run the MCP server
 uv run ticorates-mcp
 
-# Run tests
-uv run pytest
+# Run unit tests (no credentials needed)
+uv run python -m pytest
+
+# Run the full stress test against the live BCCR API (requires .env)
+uv run python tests/stress/stress_test.py
 ```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jonach1998/ticorates&type=Date)](https://star-history.com/#jonach1998/ticorates&Date)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

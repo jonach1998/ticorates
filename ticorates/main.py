@@ -36,7 +36,7 @@ app = FastAPI(
 app.include_router(rates_router)
 app.include_router(currencies_router)
 
-instrumentator = Instrumentator()
+instrumentator = Instrumentator(should_group_status_codes=False)
 instrumentator.instrument(app)
 instrumentator.expose(app, endpoint="/metrics", include_in_schema=False)
 

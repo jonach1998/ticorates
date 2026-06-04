@@ -9,6 +9,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --no-dev --frozen
 
+RUN mkdir -p /app/data
+
 COPY . .
 
 EXPOSE 8000

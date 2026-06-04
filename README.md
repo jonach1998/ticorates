@@ -343,6 +343,10 @@ docker compose up -d
 The API will be available at `http://localhost:8000`.  
 Interactive docs at `http://localhost:8000/docs`.
 
+### Monitoring
+
+The app exposes Prometheus metrics at `/metrics` (request counts by status, latency histograms). Scrape it from your monitoring stack — but keep `/metrics` off the public internet (block the path at your reverse proxy or tunnel), since it's an internal operational endpoint.
+
 ---
 
 ## Development

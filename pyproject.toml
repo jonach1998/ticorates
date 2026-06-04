@@ -1,6 +1,6 @@
 [project]
 name = "ticorates-mcp"
-version = "1.0.5"
+version = "1.1.0"
 description = "Public exchange rate API for Costa Rica, powered by BCCR"
 license = "MIT"
 readme = "README.md"
@@ -12,6 +12,7 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "pydantic-settings>=2.6.0",
     "mcp>=1.0.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 
 [project.optional-dependencies]

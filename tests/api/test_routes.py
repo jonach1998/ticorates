@@ -149,3 +149,9 @@ def test_bccr_error_returns_502(client, mock_service):
     response = client.get("/rates/latest?currency=USD")
     assert response.status_code == 502
     assert "upstream failure" in response.json()["detail"]
+
+
+def test_metrics_endpoint_exposes_prometheus(client):
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "http_request" in response.text

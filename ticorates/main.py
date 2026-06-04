@@ -5,6 +5,7 @@ from importlib.metadata import version as _version
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from ticorates.api.routes import currencies_router, rates_router
 from ticorates.clients.bccr_client import BCCRClient
@@ -34,6 +35,10 @@ app = FastAPI(
 
 app.include_router(rates_router)
 app.include_router(currencies_router)
+
+instrumentator = Instrumentator()
+instrumentator.instrument(app)
+instrumentator.expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.get("/health", tags=["health"])

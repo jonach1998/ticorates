@@ -152,6 +152,7 @@ def test_bccr_error_returns_502(client, mock_service):
 
 
 def test_metrics_endpoint_exposes_prometheus(client):
+    client.get("/currencies", headers={"cf-connecting-ip": "203.0.113.1"})
     response = client.get("/metrics")
     assert response.status_code == 200
-    assert "http_request" in response.text
+    assert "http_requests_total" in response.text

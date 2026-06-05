@@ -5,12 +5,13 @@ from importlib.metadata import version as _version
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from ticorates.api.routes import currencies_router, rates_router
 from ticorates.clients.bccr_client import BCCRClient
+from ticorates.core.config import settings
 from ticorates.core.database import create_tables
 from ticorates.core.exceptions import BCCRError, NoDataError, UnsupportedCurrencyError
+from ticorates.core.observability import build_instrumentator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,9 +37,8 @@ app = FastAPI(
 app.include_router(rates_router)
 app.include_router(currencies_router)
 
-instrumentator = Instrumentator(should_group_status_codes=False)
-instrumentator.instrument(app)
-instrumentator.expose(app, endpoint="/metrics", include_in_schema=False)
+instrumentator = build_instrumentator(settings.metrics_trusted_header)
+instrumentator.instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.get("/health", tags=["health"])

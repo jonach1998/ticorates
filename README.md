@@ -332,6 +332,9 @@ BCCR_BASE_URL=https://apim.bccr.fi.cr/SDDE/api/Bccr.GE.SDDE.Publico.Indicadores.
 
 # Optional — change the SQLite database path (default: /app/data/ticorates.db)
 # DATABASE_URL=sqlite:////custom/path/ticorates.db
+
+# Optional — only count requests with this header in /metrics (see Monitoring)
+# METRICS_TRUSTED_HEADER=CF-Connecting-IP
 ```
 
 **3. Start the service:**
@@ -346,6 +349,8 @@ Interactive docs at `http://localhost:8000/docs`.
 ### Monitoring
 
 The app exposes Prometheus metrics at `/metrics` (request counts by status, latency histograms). Scrape it from your monitoring stack — but keep `/metrics` off the public internet (block the path at your reverse proxy or tunnel), since it's an internal operational endpoint.
+
+By default every request is counted. If you run behind a trusted proxy that tags real traffic with a header, set `METRICS_TRUSTED_HEADER` to count only those requests and keep internal traffic (scrapes, healthchecks, LAN) out of your metrics. With Cloudflare, use `METRICS_TRUSTED_HEADER=CF-Connecting-IP`.
 
 ---
 

@@ -335,6 +335,13 @@ BCCR_BASE_URL=https://apim.bccr.fi.cr/SDDE/api/Bccr.GE.SDDE.Publico.Indicadores.
 
 # Optional — only count requests with this header in /metrics (see Monitoring)
 # METRICS_TRUSTED_HEADER=CF-Connecting-IP
+
+# Optional — expose an MCP server at /mcp for AI assistants. Default: false.
+# MCP_ENABLED=true
+
+# Optional — only relevant when MCP_ENABLED=true. Base URL the mounted MCP
+# tools call (default: https://ticorates.dev).
+# TICORATES_BASE_URL=http://localhost:8000
 ```
 
 **3. Start the service:**

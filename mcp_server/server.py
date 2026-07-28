@@ -2,9 +2,9 @@ import asyncio
 import os
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
-mcp = FastMCP("TicoRates")
+mcp = MCPServer("TicoRates")
 
 _BASE_URL = os.environ.get("TICORATES_BASE_URL", "https://ticorates.dev")
 _HTTP_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)

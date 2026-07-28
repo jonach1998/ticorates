@@ -1,3 +1,4 @@
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from importlib.metadata import version as _version
@@ -6,6 +7,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from mcp_server.server import mcp as ticorates_mcp
 from ticorates.api.routes import currencies_router, rates_router
 from ticorates.clients.bccr_client import BCCRClient
 from ticorates.core.config import settings
@@ -22,8 +24,11 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
-    async with httpx.AsyncClient() as http_client:
+    async with contextlib.AsyncExitStack() as stack:
+        http_client = await stack.enter_async_context(httpx.AsyncClient())
         app.state.bccr_client = BCCRClient(http_client)
+        if settings.mcp_enabled:
+            await stack.enter_async_context(ticorates_mcp.session_manager.run())
         yield
 
 
@@ -36,6 +41,12 @@ app = FastAPI(
 
 app.include_router(rates_router)
 app.include_router(currencies_router)
+
+if settings.mcp_enabled:
+    app.mount(
+        "/mcp",
+        ticorates_mcp.streamable_http_app(stateless_http=True, json_response=True, streamable_http_path="/"),
+    )
 
 instrumentator = build_instrumentator(settings.metrics_trusted_header)
 instrumentator.instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)

@@ -9,6 +9,8 @@ Free, open exchange rate API for Costa Rica — powered by BCCR. No sign-up, no 
 
 **Live server → `https://ticorates.dev` — free for everyone, no API key required.**
 
+**MCP server → `https://ticorates.dev/mcp/` — same server, for Claude, Cursor, and other AI tools.**
+
 ## How it works
 
 1. **Request** — you call any endpoint with a date and currency code.
@@ -38,13 +40,15 @@ curl https://ticorates.dev/currencies
 
 Interactive docs → **[ticorates.dev/docs](https://ticorates.dev/docs)**
 
+**Prefer to just ask an AI?** TicoRates also runs a hosted [MCP](https://modelcontextprotocol.io/) server — see [MCP Server](#mcp-server) below.
+
 ## Features
 
 - **REST API** — simple HTTP endpoints, no authentication required
 - **43 currencies** — USD, EUR, GBP, JPY, CAD, AUD, CHF, and more
 - **On-demand caching** — rates are fetched from BCCR on first request and served instantly after
 - **Historical rates** — query any date or date range going back years
-- **MCP server** — native integration with Claude, Cursor, Windsurf, and other AI tools
+- **MCP server** — hosted, zero-install integration with Claude, Cursor, Windsurf, and other AI tools
 - **Self-hosted** — Docker image available for `linux/amd64` and `linux/arm64`
 
 ## Table of Contents
@@ -185,7 +189,7 @@ Health check endpoint. Returns `200 OK` when the service is running.
 
 ## MCP Server
 
-> **No API key required.** The MCP server connects to `https://ticorates.dev` by default — install it and it just works.
+> **No API key required.** The MCP server connects to `https://ticorates.dev` by default — pick a setup option below and it just works.
 
 TicoRates includes an [MCP](https://modelcontextprotocol.io/) server that gives AI assistants direct access to Costa Rican exchange rates. Ask your AI questions like:
 
@@ -208,14 +212,29 @@ TicoRates includes an [MCP](https://modelcontextprotocol.io/) server that gives 
 
 ### Setup
 
-The same config block works across all MCP-compatible clients. Pick yours below.
+#### Option 1 — Remote (recommended, nothing to install)
 
-#### Claude Desktop
+Same config block for Claude Desktop, Claude Code, Cursor, Windsurf, and anything else that reads `mcpServers` JSON. Requires [Node.js](https://nodejs.org/) (for `npx`) — nothing else, no Python or `uv`.
 
-Edit `claude_desktop_config.json` and restart Claude Desktop.
+```json
+{
+  "mcpServers": {
+    "ticorates": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://ticorates.dev/mcp/"]
+    }
+  }
+}
+```
 
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) / `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+- **Claude Code:** `claude mcp add ticorates -- npx mcp-remote https://ticorates.dev/mcp/`
+- **Cursor:** `~/.cursor/mcp.json`
+- **Windsurf:** Cascade panel → ⚙ Settings → MCP Servers → Add, same command/args
+
+#### Option 2 — Local (stdio via `uvx`)
+
+Runs the server as a local process instead of talking to the hosted one. Same tools, same data — useful if you'd rather not depend on the network, or your client only supports plain `stdio`.
 
 ```json
 {
@@ -228,65 +247,20 @@ Edit `claude_desktop_config.json` and restart Claude Desktop.
 }
 ```
 
-#### Claude Code
-
-Run once in your terminal:
-
-```bash
-claude mcp add ticorates -- uvx ticorates-mcp
-```
-
-#### Cursor
-
-Add to `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "ticorates": {
-      "command": "uvx",
-      "args": ["ticorates-mcp"]
-    }
-  }
-}
-```
-
-Or go to **Settings → Cursor Settings → Features → MCP → Add MCP Server**.
-
-#### Windsurf
-
-Open the Cascade panel → **⚙ Settings → MCP Servers → Add**, then enter:
-
-- **Command:** `uvx`
-- **Args:** `ticorates-mcp`
-
-#### OpenAI Codex CLI
-
-```bash
-codex mcp add ticorates -- uvx ticorates-mcp
-```
-
-#### Other clients
-
-Any MCP-compatible client that supports `stdio` transport works with TicoRates. Use the same JSON config structure shown above.
+Same file paths as above. For Claude Code: `claude mcp add ticorates -- uvx ticorates-mcp`.
 
 ### Pointing the MCP at a self-hosted instance
 
-By default, `ticorates-mcp` connects to `https://ticorates.dev`. To use your own instance, set `TICORATES_BASE_URL` in your client's config:
+Both setups above default to `https://ticorates.dev`. If you're self-hosting:
 
-```json
-{
-  "mcpServers": {
-    "ticorates": {
-      "command": "uvx",
-      "args": ["ticorates-mcp"],
-      "env": {
-        "TICORATES_BASE_URL": "http://your-server:8000"
-      }
-    }
-  }
-}
-```
+- **Remote** — point `mcp-remote` at your own `/mcp` endpoint (requires `MCP_ENABLED=true`, see [Self-Hosting](#self-hosting)):
+  ```json
+  { "args": ["mcp-remote", "http://your-server:8000/mcp/"] }
+  ```
+- **Local (`uvx`)** — set `TICORATES_BASE_URL` in your client's config:
+  ```json
+  { "args": ["ticorates-mcp"], "env": { "TICORATES_BASE_URL": "http://your-server:8000" } }
+  ```
 
 ---
 

@@ -7,6 +7,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp_server.server import mcp as ticorates_mcp
 from ticorates.api.routes import currencies_router, rates_router
 from ticorates.clients.bccr_client import BCCRClient
@@ -45,7 +46,12 @@ app.include_router(currencies_router)
 if settings.mcp_enabled:
     app.mount(
         "/mcp",
-        ticorates_mcp.streamable_http_app(stateless_http=True, json_response=True, streamable_http_path="/"),
+        ticorates_mcp.streamable_http_app(
+            stateless_http=True,
+            json_response=True,
+            streamable_http_path="/",
+            transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+        ),
     )
 
 instrumentator = build_instrumentator(settings.metrics_trusted_header)
